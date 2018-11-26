@@ -42,7 +42,7 @@ homicide_data = read_csv(file = "./data/homicide-data.csv") # import dataset
 
 The raw data is a dataframe regarding homicides from 28 different states that took place from Jan 1, 2007 to November 2015. The dataset is composed of `r nrow(homicide_data)` observations of `r ncol(homicide_data)` variables. The variables include: unique case ID, reported date, victim last name and first name, as well as demographic information of the victim (race, age, sex). There is also information on the location including city, state, latitude/longitude, and finally, the disposition of the case (e.g. whether or not the case was resolved).
 
-The code chunk below creates a city_state variable (e.g. “Baltimore, MD”) and a binary variable indicating whether the homicide is solved. We also omit cities Dallas, TX; Phoenix, AZ; and Kansas City, MO – these don’t report victim race. We omit Tulsa, AL – this is a data entry mistake. The code modifies victim_race to have categories white and non-white, with white as the reference category. We also ensure sure that victim_age is numeric.
+The code chunk below creates a city_state variable (e.g. “Baltimore, MD”) and a binary variable indicating whether the homicide is solved. We also omit cities Dallas, TX; Phoenix, AZ; and Kansas City, MO – these don’t report victim race. We omit Tulsa, AL – this is a data entry mistake. The code modifies victim_race to have categories white and non-white, with white as the reference category. We also further omitted cases where the race was coded as "Unknown". Lastly, we ensure sure that victim_age is numeric.
 
 ```{r data manipulation}
 
@@ -67,14 +67,17 @@ homicide_data =
          victim_race = str_replace(victim_race, "Black", "Non-White"),
          victim_race = str_replace(victim_race, "Asian", "Non-White"), 
          victim_race = as_factor(victim_race),
-         victim_race = fct_relevel(victim_race, "White", "Non-White"))
+         victim_race = fct_relevel(victim_race, "White", "Non-White"),
+         victim_sex = factor(victim_sex))
   
          # Above modifies the victim_race variable to have categories White and Non-White with White as the reference category
          # We removed the cases where the victim_race was coded as "Unknown" 
 
 ```
 
-For the city of Baltimore, MD, use the glm function to fit a logistic regression with resolved vs unresolved as the outcome and victim age, sex and race (as just defined) as predictors. Save the output of glm as an R object; apply the broom::tidy to this object; and obtain the estimate and confidence interval of the adjusted odds ratio for solving homicides comparing non-white victims to white victims keeping all other variables fixed.
+For the city of Baltimore, MD, we use the glm function to fit a logistic regression with resolved (Note: coded as is_solved = 1) vs unresolved (coded as is_solved = 0) as the outcome and victim age, sex, and race (as just defined) as predictors.
+
+The output of the glm is saved as an R object, `glm_baltimore`; we apply the broom::tidy to this object and obtain the estimate and confidence interval of the adjusted odds ratio for solving homicides comparing non-white victims to white victims, keeping all other variables fixed.
 
 ```{r logistic regression}
 
@@ -84,39 +87,95 @@ baltimore_df =   # examine city of Baltimore, MD only
 
 glm_baltimore = 
   baltimore_df %>% 
-  glm(is_solved ~ victim_age + victim_sex + victim_race,
-      data = .,
-      family = binomial()) %>% 
-  broom::tidy() %>% 
-  mutate(OR = exp(estimate)) %>% 
-  select(term, log_OR = estimate, OR, p.value) %>% # also need to obtain the confidence interval of the OR
-  knitr::kable()
-# hm, shouldn't there be two indicator variables for race? Should I filter to remove rows that had "Unknown" race before running the model? 
+  glm(is_solved ~ victim_age + victim_sex + victim_race, data = ., family = binomial()) # save output of glm as R object
+
+# apply broom::tidy to this object 
+  broom::tidy(glm_baltimore, conf.int = TRUE) %>% 
+  mutate(OR = exp(estimate),
+         conf_lower = exp(conf.low),
+         conf_upper = exp(conf.high)) %>% 
+  select(term, log_OR = estimate, OR, conf_lower, conf_upper, p.value) %>% # also need to obtain the confidence interval of the OR
+  filter(term == "victim_raceNon-White") %>% 
+  knitr::kable(digits = 3)
 
 print(glm_baltimore)
 
 ```
 
-DISCUSS RESULTS OF THE BALTIMORE GLM HERE.
+From the results of the logistic regression, we can see that the odds ratio for a homicide being resolved comparing non-whites to whites (all other variables fixed) is 0.441. In other words, the odds of a homicide being resolved are 55.9% lower for non-whites compared to whites, adjusting for the victim's age, sex, and race. We are 95% confident that the true odds ratio for resolved homicides comparing non-whites to whites, keeping other variables constant, lies within the range (0.312, 0.62). 
 
-Now run glm for each of the cities in your dataset, and extract the adjusted odds ratio (and CI) for solving homicides comparing non-white victims to white victims. Do this within a “tidy” pipeline, making use of purrr::map, list columns, and unnest as necessary to create a dataframe with estimated ORs and CIs for each city.
+Next, I will run a glm for each of the cities in my dataset, and will extract the adjusted odds ratio (and CI) for solving homicides comparing non-white victims to white victims. *Do this within a “tidy” pipeline, making use of purrr::map, list columns, and unnest as necessary to create a dataframe with estimated ORs and CIs for each city.* 
 
 ```{r glm all cities}
 
+homicide_data = 
+  homicide_data %>% 
+  mutate(is_solved = recode(is_solved,
+                            "0" = "unresolved",
+                            "1" = "resolved")) # got an error so need to recode 
+                                               # note that I'm still comparing resolved cases to unresolved, i.e. unresolved is the ref category
 
+nest_glm_all =
+  homicide_data %>% 
+  group_by(city_state) %>% 
+  nest() %>% 
+  mutate(models = map(data, ~glm(is_solved ~ victim_age + victim_race + victim_sex,
+                                 data = .,
+                                 family = binomial())),
+         models = map(models, broom::tidy, conf.int = TRUE)) %>% 
+  select(-data) %>% 
+  unnest()
 
 ```
 
-
-Create a plot that shows the estimated ORs and CIs for each city. Organize cities according to estimated OR, and comment on the plot.
+From these resuts, I will create a dataframe that includes the adjusted ORs and CIs (for solved homicide cases, comparing non-whites to whites) for each city. 
 
 ```{r}
 
+all_city_OR =
+  nest_glm_all %>% 
+    mutate(OR = exp(estimate),
+           conf_lower = exp(conf.low),
+           conf_upper = exp(conf.high)) %>%
+    dplyr::select(city_state, term, OR, conf_lower, conf_upper) %>%
+    filter(term == "victim_raceNon-white")  
+
 ```
+
+I display the results in a table below: 
+
+```{r kable}
+
+all_city_OR %>%
+   knitr::kable(digits = 3)
+
+```
+
+Lastly, I create a plot that shows the estimated ORs and CIs for each city. Organize cities according to estimated OR, and comment on the plot.
+
+```{r plot ORs and CIs for each city}
+
+# need to edit 
+all_city_OR %>%
+  mutate(city_state = forcats::fct_reorder(city_state, OR)) %>%
+  ggplot(aes(x = city_state, y = OR)) + 
+      geom_errorbar(aes(ymin = conf_lower, ymax = conf_upper), width = 0.2) +
+      geom_point(size = 3, shape = 21, fill = "white") + 
+  labs(
+    title = "Solved homicides, comparing non-white victims to white victims",
+    x = "City",
+    y = "Adjusted odds ratio",
+    caption = "Data from the Washington Post, adjusted for victim age, race, and sex"
+  ) + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 8))
+
+```
+
+DISCUSS. 
 
 ## Problem 2 
 
-In this probelm, you will analyze data gathered to understand the effects of several variables on a child’s birthweight. This dataset consists of roughly 4000 children and includes the following variables:
+In this problem, I will analyze data gathered to understand the effects of several variables on a child’s birthweight. This dataset consists of roughly 4000 children and includes the following variables:
 
 babysex: baby’s sex (male = 1, female = 2)
 bhead: baby’s head circumference at birth (centimeters)
@@ -139,7 +198,27 @@ ppwt: mother’s pre-pregnancy weight (pounds)
 smoken: average number of cigarettes smoked per day during pregnancy
 wtgain: mother’s weight gain during pregnancy (pounds)
 
-Load and clean the data for regression analysis (i.e. convert numeric to factor where appropriate, check for missing data, etc.).
+The code below loads and clean the data for regression analysis (i.e. converts numeric to factor where appropriate, checks for missing data, etc.).
+
+```{r import and clean data}
+
+# Import data
+birthweight_data = read_csv(file = "./data/birthweight.csv")
+
+# Manipulate data
+birthweight_data = 
+  birthweight_data %>% 
+  mutate(
+      babysex = factor(babysex),
+      frace = factor(frace),
+      malform = factor(malform),
+      mrace = factor(mrace)
+  )
+
+# Check data for regression analysis
+
+```
+
 
 Propose a regression model for birthweight. This model may be based on a hypothesized structure for the factors that underly birthweight, on a data-driven model-building process, or a combination of the two. Describe your modeling process and show a plot of model residuals against fitted values – use add_predictions and add_residuals in making this plot.
 
