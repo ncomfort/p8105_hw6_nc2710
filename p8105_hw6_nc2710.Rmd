@@ -58,16 +58,19 @@ homicide_data =
                        "Closed without arrest" = FALSE,
                        "Open/No arrest" = FALSE,
                        "Closed by arrest" = TRUE)) %>% 
+  mutate(is_solved = as.numeric(is_solved)) %>% # 1 is for solved cases, 0 for unsolved 
+  mutate(is_solved = as.factor(is_solved)) %>%  # not sure if this conversion is necessary
   mutate(victim_age = as.numeric(victim_age)) %>% # make victim age numeric
+  filter(victim_race != "Unknown") %>% # remove cases where race is unknown 
   mutate(victim_race = str_replace(victim_race, "Hispanic", "Non-White"),
          victim_race = str_replace(victim_race, "Other", "Non-White"),
          victim_race = str_replace(victim_race, "Black", "Non-White"),
          victim_race = str_replace(victim_race, "Asian", "Non-White"), 
          victim_race = as_factor(victim_race),
-         victim_race = fct_relevel(victim_race, "White", "Non-White", "Unknown"))
-         # Above modifies the victim_race variable to have categories White, Non-White, and Unknown, with White as the reference category
-
-         # What about Unknown race ???
+         victim_race = fct_relevel(victim_race, "White", "Non-White"))
+  
+         # Above modifies the victim_race variable to have categories White and Non-White with White as the reference category
+         # We removed the cases where the victim_race was coded as "Unknown" 
 
 ```
 
@@ -86,7 +89,7 @@ glm_baltimore =
       family = binomial()) %>% 
   broom::tidy() %>% 
   mutate(OR = exp(estimate)) %>% 
-  select(term, log_OR = estimate, OR, p.value) %>% 
+  select(term, log_OR = estimate, OR, p.value) %>% # also need to obtain the confidence interval of the OR
   knitr::kable()
 # hm, shouldn't there be two indicator variables for race? Should I filter to remove rows that had "Unknown" race before running the model? 
 
@@ -94,7 +97,16 @@ print(glm_baltimore)
 
 ```
 
+DISCUSS RESULTS OF THE BALTIMORE GLM HERE.
+
 Now run glm for each of the cities in your dataset, and extract the adjusted odds ratio (and CI) for solving homicides comparing non-white victims to white victims. Do this within a “tidy” pipeline, making use of purrr::map, list columns, and unnest as necessary to create a dataframe with estimated ORs and CIs for each city.
+
+```{r glm all cities}
+
+
+
+```
+
 
 Create a plot that shows the estimated ORs and CIs for each city. Organize cities according to estimated OR, and comment on the plot.
 
@@ -104,7 +116,7 @@ Create a plot that shows the estimated ORs and CIs for each city. Organize citie
 
 ## Problem 2 
 
-In this probelm, you will analyze data gathered to understand the effects of several variables on a child’s birthweight. This dataset, available here, consists of roughly 4000 children and includes the following variables:
+In this probelm, you will analyze data gathered to understand the effects of several variables on a child’s birthweight. This dataset consists of roughly 4000 children and includes the following variables:
 
 babysex: baby’s sex (male = 1, female = 2)
 bhead: baby’s head circumference at birth (centimeters)
