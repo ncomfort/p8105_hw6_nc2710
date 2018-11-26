@@ -42,20 +42,32 @@ homicide_data = read_csv(file = "./data/homicide-data.csv") # import dataset
 
 The raw data is a dataframe regarding homicides from 28 different states that took place from Jan 1, 2007 to November 2015. The dataset is composed of `r nrow(homicide_data)` observations of `r ncol(homicide_data)` variables. The variables include: unique case ID, reported date, victim last name and first name, as well as demographic information of the victim (race, age, sex). There is also information on the location including city, state, latitude/longitude, and finally, the disposition of the case (e.g. whether or not the case was resolved).
 
-The code chunk below creates a city_state variable (e.g. “Baltimore, MD”) and a binary variable indicating whether the homicide is solved. We also omit cities Dallas, TX; Phoenix, AZ; and Kansas City, MO – these don’t report victim race. We omit Tulsa, AL – this is a data entry mistake. The code modifies victim_race to have categories white and non-white, with white as the reference category. Be sure that victim_age is numeric.
+The code chunk below creates a city_state variable (e.g. “Baltimore, MD”) and a binary variable indicating whether the homicide is solved. We also omit cities Dallas, TX; Phoenix, AZ; and Kansas City, MO – these don’t report victim race. We omit Tulsa, AL – this is a data entry mistake. The code modifies victim_race to have categories white and non-white, with white as the reference category. We also ensure sure that victim_age is numeric.
 
 ```{r data manipulation}
 
 homicide_data = 
   homicide_data %>% 
   janitor::clean_names() %>% # clean names
-  mutate(city_state = str_c(city, state, sep = ", ", collapse = NULL)) %>% # create a city_state variable (e.g. “Baltimore, MD”)
-  ungroup() %>% 
-  filter(city_state != "Tulsa, AL" | "Dallas, TX" | "Phoenix, AZ" | "Kansas City, MO") %>%  # omit cities
+  mutate(city_state = str_c(city, state, sep = ", ", collapse = NULL)) %>% # create a city_state variable
+  filter(city_state != "Tulsa, AL") %>% 
+  filter(city_state != "Dallas, TX") %>% 
+  filter(city_state != "Phoenix, AZ") %>% 
+  filter(city_state != "Kansas City, MO") %>% # omit certain cities
   mutate(is_solved = recode(disposition,    # create binary variable for whether case is solved
                        "Closed without arrest" = FALSE,
                        "Open/No arrest" = FALSE,
-                       "Closed by arrest" = TRUE))
+                       "Closed by arrest" = TRUE)) %>% 
+  mutate(victim_age = as.numeric(victim_age)) %>% # make victim age numeric
+  mutate(victim_race = str_replace(victim_race, "Hispanic", "Non-White"),
+         victim_race = str_replace(victim_race, "Other", "Non-White"),
+         victim_race = str_replace(victim_race, "Black", "Non-White"),
+         victim_race = str_replace(victim_race, "Asian", "Non-White"), 
+         victim_race = as_factor(victim_race),
+         victim_race = fct_relevel(victim_race, "White", "Non-White", "Unknown"))
+         # Above modifies the victim_race variable to have categories White, Non-White, and Unknown, with White as the reference category
+
+         # What about Unknown race ???
 
 ```
 
