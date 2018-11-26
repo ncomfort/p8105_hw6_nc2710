@@ -175,7 +175,7 @@ DISCUSS.
 
 ## Problem 2 
 
-In this problem, I will analyze data gathered to understand the effects of several variables on a child’s birthweight. This dataset consists of roughly 4000 children and includes the following variables:
+In this problem, I will analyze data gathered to understand the effects of several variables on a child’s birthweight. This dataset consists of `r nrow(birthweight_data)` children and includes the following variables:
 
 babysex: baby’s sex (male = 1, female = 2)
 bhead: baby’s head circumference at birth (centimeters)
@@ -198,7 +198,7 @@ ppwt: mother’s pre-pregnancy weight (pounds)
 smoken: average number of cigarettes smoked per day during pregnancy
 wtgain: mother’s weight gain during pregnancy (pounds)
 
-The code below loads and clean the data for regression analysis (i.e. converts numeric to factor where appropriate, checks for missing data, etc.).
+The code below loads and clean the data for regression analysis (i.e. converts numeric to factor where appropriate, checks for missing data, etc.). 
 
 ```{r import and clean data}
 
@@ -215,21 +215,45 @@ birthweight_data =
       mrace = factor(mrace)
   )
 
-# Check data for regression analysis
+# Check missing data
+birthweight_data %>% 
+  is.na() %>% summary()
+
+```
+
+There is no missing data.
+
+### Proposed regression model for birthweight
+
+Socioeconomic status, whether assessed by income, education, or occupation, is linked to a wide range of health problems. Thus, I propose to run a linear regression model based on a hypothesized structure, aka a model that investigates the relationship between birthweight and socioeconomic status (estimated by family monthly income), adjusted for other factors that may contribute to low birthweight: mother's weight at delivery, gestational age in weeks, presence of malformations, previous number of low birthweight babies, smoking status, and mother's pre-pregnancy BMI. (I will also perform a sensitity analysis that includes maternal height and pre-pregnancy/at delivery weight to see if these are more informative than BMI.)
+
+```{r proposed regression model for birthweight}
+
+# Look at whether family income predicts birthweight, adjusted for covariates 
+fit = lm(bwt ~ fincome + delwt + gaweeks + malform + pnumlbw + smoken + ppbmi, data = birthweight_data)
+
+
+
+```
+
+DESCRIBE MODELING PROCESS AND RESULTS.
+
+```{r residuals plot}
+
+# plot model residuals against fitted values - use add_predictions and add_residuals in making this plot
+
 
 ```
 
 
-Propose a regression model for birthweight. This model may be based on a hypothesized structure for the factors that underly birthweight, on a data-driven model-building process, or a combination of the two. Describe your modeling process and show a plot of model residuals against fitted values – use add_predictions and add_residuals in making this plot.
+I will next compare my model to two others:
 
-Compare your model to two others:
+* One using length at birth and gestational age as predictors (main effects only)
+* One using head circumference, length, sex, and all interactions (including the three-way interaction) between these
 
-One using length at birth and gestational age as predictors (main effects only)
-One using head circumference, length, sex, and all interactions (including the three-way interaction) between these
 Make this comparison in terms of the cross-validated prediction error; use crossv_mc and functions in purrr as appropriate.
 
 Note that although we expect your model to be reasonable, model building itself is not a main idea of the course and we don’t necessarily expect your model to be “optimal”.
-
 
 ```{r}
 
