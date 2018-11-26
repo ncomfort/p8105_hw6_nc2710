@@ -7,13 +7,58 @@ output: github_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(ggplot2)
+library(ggridges)
+library(readxl)
+library(dplyr)
+library(janitor)
+library(patchwork)
+library(viridis)
+library(rvest)
+library(purrr)
+library(stringr) 
+
+# set options for figures
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.asp = .6,
+  out.width = "95%"
+)
+
+theme_set(theme_bw() + theme(legend.position = "bottom"))
 ```
 
 ## Problem 1
 
-The Washington Post has gathered data on homicides in 50 large U.S. cities and made the data available through a GitHub repository. 
+The Washington Post has gathered data on homicides in 50 large U.S. cities and made the data available through a GitHub repository. The code below loads the raw data (which we also saw on the previous homework):
 
-Create a city_state variable (e.g. “Baltimore, MD”), and a binary variable indicating whether the homicide is solved. Omit cities Dallas, TX; Phoenix, AZ; and Kansas City, MO – these don’t report victim race. Also omit Tulsa, AL – this is a data entry mistake. Modifiy victim_race to have categories white and non-white, with white as the reference category. Be sure that victim_age is numeric.
+```{r import homicide data}
+
+homicide_data = read_csv(file = "./data/homicide-data.csv") # import dataset
+
+```
+
+The raw data is a dataframe regarding homicides from 28 different states that took place from Jan 1, 2007 to November 2015. The dataset is composed of `r nrow(homicide_data)` observations of `r ncol(homicide_data)` variables. The variables include: unique case ID, reported date, victim last name and first name, as well as demographic information of the victim (race, age, sex). There is also information on the location including city, state, latitude/longitude, and finally, the disposition of the case (e.g. whether or not the case was resolved).
+
+The code chunk below creates a city_state variable (e.g. “Baltimore, MD”) and a binary variable indicating whether the homicide is solved. We also omit cities Dallas, TX; Phoenix, AZ; and Kansas City, MO – these don’t report victim race. We omit Tulsa, AL – this is a data entry mistake. The code modifies victim_race to have categories white and non-white, with white as the reference category. Be sure that victim_age is numeric.
+
+```{r data manipulation}
+
+homicide_data = 
+  homicide_data %>% 
+  janitor::clean_names() %>% # clean names
+  mutate(city_state = str_c(city, state, sep = ", ", collapse = NULL)) %>% # create a city_state variable (e.g. “Baltimore, MD”)
+  ungroup() %>% 
+  filter(city_state != "Tulsa, AL" | "Dallas, TX" | "Phoenix, AZ" | "Kansas City, MO") %>%  # omit cities
+  mutate(is_solved = recode(disposition,    # create binary variable for whether case is solved
+                       "Closed without arrest" = FALSE,
+                       "Open/No arrest" = FALSE,
+                       "Closed by arrest" = TRUE))
+
+```
+
 
 For the city of Baltimore, MD, use the glm function to fit a logistic regression with resolved vs unresolved as the outcome and victim age, sex and race (as just defined) as predictors. Save the output of glm as an R object; apply the broom::tidy to this object; and obtain the estimate and confidence interval of the adjusted odds ratio for solving homicides comparing non-white victims to white victims keeping all other variables fixed.
 
