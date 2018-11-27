@@ -77,6 +77,8 @@ homicide_data =
 
 ```
 
+### Baltimore, MD 
+
 For the city of Baltimore, MD, we use the glm function to fit a logistic regression with resolved (Note: coded as is_solved = 1) vs unresolved (coded as is_solved = 0) as the outcome and victim age, sex, and race (white/non-white) as predictors.
 
 The output of the glm is saved as an R object, `glm_baltimore`; we apply the broom::tidy to this object and obtain the estimate and confidence interval of the adjusted odds ratio for solving homicides comparing non-white victims to white victims, keeping all other variables fixed.
@@ -105,6 +107,8 @@ print(glm_baltimore)
 ```
 
 From the results of the logistic regression, we can see that the odds ratio for a homicide being resolved comparing non-whites to whites (all other variables fixed) is 0.441. In other words, the odds of a homicide being resolved are 55.9% lower for non-whites compared to whites, adjusting for the victim's age, sex, and race. We are 95% confident that the true odds ratio for resolved homicides comparing non-whites to whites, keeping other variables constant, lies within the range (0.312, 0.62). 
+
+### All Cities 
 
 Next, I will run a glm for each of the cities in my dataset, and will extract the adjusted odds ratio (and CI) for solving homicides comparing non-white victims to white victims. *Do this within a “tidy” pipeline, making use of purrr::map, list columns, and unnest as necessary to create a dataframe with estimated ORs and CIs for each city.* 
 
@@ -152,6 +156,8 @@ all_city_OR %>%
    knitr::kable(digits = 3)
 
 ```
+
+### Plot ORs for All Cities
 
 Lastly, I create a plot that shows the estimated ORs and CIs for each city. Cities are organized according to the estimated OR. 
 
@@ -293,6 +299,8 @@ Even after adjusting for mother's weight at delivery, gestational age in weeks, 
 
 In a sensitivity analysis that also included maternal height as a predictor and maternal height + pre-pregnancy weight, the estimated coefficient for family income essentially did not change. Thus, using pre-pregnancy BMI was sufficient. 
 
+### Model Fit Statistics 
+
 Next, I review the model fit statistics of my simple and adjusted model. I also noticed that there are very few cases of malformations at birth, so try taking that out of the model and review the model fit statistics.
 
 ```{r model fit}
@@ -349,6 +357,8 @@ From the regression diagnostics, we can see that this model obviously needs some
 
 *Note: Model building itself is not a main idea of the course and this model therefore is by no means "optimal"*
 
+### Model Comparison 
+
 I will next compare my model to two others:
 
 * One using length at birth and gestational age as predictors (main effects only)
@@ -380,15 +390,64 @@ model_two_fit %>% broom::glance()
 
 Because these are not nested models but competing models, we will compare the models using the cross-validated prediction error. 
 
+We will use `crossv_mc` to resample objects from the dataframe (for training and testing). 
+
 ```{r cross-validated prediction error}
 
 # Make this comparison in terms of the cross-validated prediction error; use crossv_mc and functions in purrr as appropriate
+cv_df =
+  crossv_mc(birthweight_data, 100) 
+
+cv_df
 
 ```
 
+Fit the models and assess prediction accuracy by examining Root mean squared errors (RMSEs):
 
+```{r, warning = FALSE}
 
-```{r}
+cv_df = 
+  cv_df %>% 
+  mutate(final_model_fit = map(train, ~lm(bwt ~ fincome + delwt + gaweeks+ pnumlbw + smoken + ppbmi,
+                                              data = .x)),
+         model_one_fit = map(train, ~lm(bwt ~ blength + gaweeks, data = .x)),
+         model_two_fit = map(train, ~lm(bwt ~ bhead + blength + babysex +
+                                          (bhead * blength) + (blength * babysex) + (bhead * babysex) +
+                                          (bhead * blength * babysex), data = .x))) %>% 
+  mutate(rmse_final_model = map2_dbl(final_model_fit, test, ~rmse(model = .x, data = .y)),
+         rmse_model_one   = map2_dbl(model_one_fit, test, ~rmse(model = .x, data = .y)),
+         rmse_model_two   = map2_dbl(model_two_fit, test, ~rmse(model = .x, data = .y)))
 
 ```
+
+Plot the distribution of RMSE values for my proposed model and the two comparison models:
+
+```{r plot RMSE distribution}
+
+cv_df %>% 
+  dplyr::select(starts_with("rmse")) %>% 
+  gather(key = model, value = rmse) %>% 
+  mutate(model = str_replace(model, "rmse_", ""),
+         model = fct_inorder(model)) %>% 
+  ggplot(aes(x = model, y = rmse)) + 
+    geom_violin() +
+    labs(
+      title = "Distribution of RMSE values",
+      x = "Regression model",
+      y = "RMSE"
+    )
+
+```
+
+This plot compares prediction error distributions across models.
+
+As a reminder: 
+
+final_model = `lm(bwt ~ fincome + delwt + gaweeks+ pnumlbw + smoken + ppbmi, data = birthweight_data)`
+
+model_one = `lm(bwt ~ blength + gaweeks, data = birthweight_data)`
+
+model_two = `lm(bwt ~ bhead + blength + babysex + (bhead * blength) + (bhead * babysex) + (blength * babysex) + (bhead * blength * babysex), data = birthweight_data)`
+
+The second comparison model which includes baby's head circumference, length, and sex with all interactions provides the best fit. My proposed model has the largest prediction errors, which is unsurprising given that the regression diagnostics did not look good. 
 
