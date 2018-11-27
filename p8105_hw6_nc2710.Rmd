@@ -19,6 +19,8 @@ library(viridis)
 library(rvest)
 library(purrr)
 library(stringr) 
+library(modelr)
+library(mgcv)
 
 # set options for figures
 knitr::opts_chunk$set(
@@ -75,7 +77,7 @@ homicide_data =
 
 ```
 
-For the city of Baltimore, MD, we use the glm function to fit a logistic regression with resolved (Note: coded as is_solved = 1) vs unresolved (coded as is_solved = 0) as the outcome and victim age, sex, and race (as just defined) as predictors.
+For the city of Baltimore, MD, we use the glm function to fit a logistic regression with resolved (Note: coded as is_solved = 1) vs unresolved (coded as is_solved = 0) as the outcome and victim age, sex, and race (white/non-white) as predictors.
 
 The output of the glm is saved as an R object, `glm_baltimore`; we apply the broom::tidy to this object and obtain the estimate and confidence interval of the adjusted odds ratio for solving homicides comparing non-white victims to white victims, keeping all other variables fixed.
 
@@ -115,7 +117,7 @@ homicide_data =
                             "1" = "resolved")) # got an error so need to recode 
                                                # note that I'm still comparing resolved cases to unresolved, i.e. unresolved is the ref category
 
-nest_glm_all =
+nest_glm_all <-
   homicide_data %>% 
   group_by(city_state) %>% 
   nest() %>% 
@@ -125,14 +127,14 @@ nest_glm_all =
          models = map(models, broom::tidy, conf.int = TRUE)) %>% 
   select(-data) %>% 
   unnest()
-
+# code SHOULD work but I'm getting error: glm.fit: fitted probabilities numerically 0 or 1 occurred 
 ```
 
 From these resuts, I will create a dataframe that includes the adjusted ORs and CIs (for solved homicide cases, comparing non-whites to whites) for each city. 
 
 ```{r}
 
-all_city_OR =
+all_city_OR <-
   nest_glm_all %>% 
     mutate(OR = exp(estimate),
            conf_lower = exp(conf.low),
@@ -151,7 +153,7 @@ all_city_OR %>%
 
 ```
 
-Lastly, I create a plot that shows the estimated ORs and CIs for each city. Organize cities according to estimated OR, and comment on the plot.
+Lastly, I create a plot that shows the estimated ORs and CIs for each city. Cities are organized according to the estimated OR. 
 
 ```{r plot ORs and CIs for each city}
 
@@ -171,7 +173,7 @@ all_city_OR %>%
 
 ```
 
-DISCUSS. 
+DISCUSS/comment on the plot. 
 
 ## Problem 2 
 
@@ -187,7 +189,7 @@ frace: father’s race (1= White, 2 = Black, 3 = Asian, 4 = Puerto Rican, 8 = Ot
 gaweeks: gestational age in weeks
 malform: presence of malformations that could affect weight (0 = absent, 1 = present)
 menarche: mother’s age at menarche (years)
-mheigth: mother’s height (inches)
+mheight: mother’s height (inches)
 momage: mother’s age at delivery (years)
 mrace: mother’s race (1= White, 2 = Black, 3 = Asian, 4 = Puerto Rican, 8 = Other)
 parity: number of live births prior to this pregnancy
@@ -225,35 +227,147 @@ There is no missing data.
 
 ### Proposed regression model for birthweight
 
-Socioeconomic status, whether assessed by income, education, or occupation, is linked to a wide range of health problems. Thus, I propose to run a linear regression model based on a hypothesized structure, aka a model that investigates the relationship between birthweight and socioeconomic status (estimated by family monthly income), adjusted for other factors that may contribute to low birthweight: mother's weight at delivery, gestational age in weeks, presence of malformations, previous number of low birthweight babies, smoking status, and mother's pre-pregnancy BMI. (I will also perform a sensitity analysis that includes maternal height and pre-pregnancy/at delivery weight to see if these are more informative than BMI.)
+Socioeconomic status, whether assessed by income, education, or occupation, is linked to a wide range of health problems. Thus, I propose to run a linear regression model based on a hypothesized structure, i.e. a model that investigates the relationship between birthweight and socioeconomic status (estimated by family monthly income), adjusted for other factors that, according to the literature, may contribute to low birthweight.
 
-```{r proposed regression model for birthweight}
+Those covariates are: mother's weight at delivery, gestational age in weeks, presence of malformations, previous number of low birthweight babies, smoking status, and mother's pre-pregnancy BMI. (I will also perform a sensitity analysis that includes maternal height and pre-pregnancy weight to see if these are more informative than BMI.)
 
-# Look at whether family income predicts birthweight, adjusted for covariates 
-fit = lm(bwt ~ fincome + delwt + gaweeks + malform + pnumlbw + smoken + ppbmi, data = birthweight_data)
+First, I look at the relationship between birthweight and family income in a simple, unadjusted linear regression (univariate analysis).
 
+```{r proposed regression model for birthweight, simple model}
 
+# Look at whether family income predicts birthweight, univariate analysis
+simple_model = 
+  lm(bwt ~ fincome, data = birthweight_data) %>% 
+  broom::tidy() %>% 
+  knitr::kable(digits = 3)
+
+print(simple_model)
 
 ```
 
-DESCRIBE MODELING PROCESS AND RESULTS.
+In a simple, unadjusted linear regression model, family monthly income (continuous variable) is a significant predictor of birthweight, such that birthweight increases with increasing family monthly income.
+
+We will next see if this relationship holds when adjusting for covariates: 
+
+```{r proposed regression model for birthweight, adjusted model}
+
+# Look at whether family income predicts birthweight, adjusted for covariates 
+adjusted_model =
+  lm(bwt ~ fincome + delwt + gaweeks + malform + pnumlbw + smoken + ppbmi, data = birthweight_data) %>% 
+  broom::tidy() %>% 
+  knitr::kable(digits = 4)
+
+print(adjusted_model)
+
+# sensitivity analyses 
+lm(bwt ~ fincome + delwt + gaweeks + malform + pnumlbw + smoken + ppbmi + mheight,
+   data = birthweight_data) %>% 
+  broom::tidy()
+
+lm(bwt ~ fincome + delwt + gaweeks + malform + pnumlbw + smoken + ppbmi + mheight + ppwt,
+   data = birthweight_data) %>% 
+  broom::tidy()
+
+```
+
+Even after adjusting for mother's weight at delivery, gestational age in weeks, presence of congenital malformations, having given birth to previous low birthweight babies, smoking, and mother's pre-pregnancy BMI, family monthly income is still significantly associated with birthweight, such that for each increase in a unit of family monthly income ($100), birthweight increases by 2.13 grams (p = 3.05e-16).
+
+In a sensitivity analysis that also included maternal height as a predictor and maternal height + pre-pregnancy weight, the estimated coefficient for family income essentially did not change. Thus, using pre-pregnancy BMI was sufficient. 
+
+Next, I review the model fit statistics of my simple and adjusted model. I also noticed that there are very few cases of malformations at birth, so try taking that out of the model and review the model fit statistics.
+
+```{r model fit}
+
+# review fit statistics 
+lm(bwt ~ fincome, data = birthweight_data) %>% 
+  broom::glance()
+
+lm(bwt ~ fincome + delwt + gaweeks + malform + pnumlbw + smoken + ppbmi, data = birthweight_data) %>% 
+  broom::glance()
+
+lm(bwt ~ fincome + delwt + gaweeks+ pnumlbw + smoken + ppbmi, data = birthweight_data) %>% 
+  broom::glance()
+
+# final model selection
+final_model = lm(bwt ~ fincome + delwt + gaweeks+ pnumlbw + smoken + ppbmi, data = birthweight_data)
+
+```
+
+Removing malformations as a covariate does not change the R squared or adjusted R squared and slightly reduces the AIC, so I will use the adjusted model that excludes malformations:
+
+`r lm(bwt ~ fincome + delwt + gaweeks+ pnumlbw + smoken + ppbmi, data = birthweight_data)`. 
+
+Next, I examine a plot of the model's residuals against the fitted values. 
 
 ```{r residuals plot}
 
 # plot model residuals against fitted values - use add_predictions and add_residuals in making this plot
+model_resid =
+  modelr::add_residuals(birthweight_data, final_model)
 
+model_pred =
+  modelr::add_predictions(birthweight_data, final_model)
+
+plot_df =
+  birthweight_data %>% 
+    mutate(resid = model_resid$resid,
+           pred = model_pred$pred)
+  
+plot_df %>% 
+  ggplot(aes(x = pred, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  labs(
+    title = "Proposed model residuals vs fitted values",
+    x = "Predicted value",
+    y = "Residuals",
+    caption = "Model: lm(bwt ~ fincome + delwt + gaweeks+ pnumlbw + smoken + ppbmi, data = birthweight_data)"
+  )
 
 ```
 
+From the regression diagnostics, we can see that this model obviously needs some work. While the residuals generally look centered around zero, there is a trend where the residuals decrease as the predicted value increases. This model may include too many covariates/be over-fitting. 
+
+*Note: Model building itself is not a main idea of the course and this model therefore is by no means "optimal"*
 
 I will next compare my model to two others:
 
 * One using length at birth and gestational age as predictors (main effects only)
 * One using head circumference, length, sex, and all interactions (including the three-way interaction) between these
 
-Make this comparison in terms of the cross-validated prediction error; use crossv_mc and functions in purrr as appropriate.
+I run these models below: 
 
-Note that although we expect your model to be reasonable, model building itself is not a main idea of the course and we don’t necessarily expect your model to be “optimal”.
+```{r model comparison}
+
+# include length at birth and gestational age as predictors (main effects)
+model_one_fit =
+  lm(bwt ~ blength + gaweeks, data = birthweight_data) 
+
+model_one_fit %>% broom::tidy()
+
+model_one_fit %>% broom::glance()
+
+# include head circumference, length, sex, and all interactions between these
+model_two_fit =
+  lm(bwt ~ bhead + blength + babysex +
+       (bhead * blength) + (bhead * babysex) + (blength * babysex) +
+       (bhead * blength * babysex), data = birthweight_data) 
+
+model_two_fit %>% broom::tidy()
+
+model_two_fit %>% broom::glance()
+
+```
+
+Because these are not nested models but competing models, we will compare the models using the cross-validated prediction error. 
+
+```{r cross-validated prediction error}
+
+# Make this comparison in terms of the cross-validated prediction error; use crossv_mc and functions in purrr as appropriate
+
+```
+
+
 
 ```{r}
 
