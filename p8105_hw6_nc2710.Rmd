@@ -108,7 +108,7 @@ From the results of the logistic regression, we can see that the odds ratio for 
 
 Next, I will run a glm for each of the cities in my dataset, and will extract the adjusted odds ratio (and CI) for solving homicides comparing non-white victims to white victims. *Do this within a “tidy” pipeline, making use of purrr::map, list columns, and unnest as necessary to create a dataframe with estimated ORs and CIs for each city.* 
 
-```{r glm all cities}
+```{r glm all cities, eval = FALSE}
 
 homicide_data = 
   homicide_data %>% 
@@ -132,7 +132,7 @@ nest_glm_all <-
 
 From these resuts, I will create a dataframe that includes the adjusted ORs and CIs (for solved homicide cases, comparing non-whites to whites) for each city. 
 
-```{r}
+```{r eval = FALSE}
 
 all_city_OR <-
   nest_glm_all %>% 
@@ -146,7 +146,7 @@ all_city_OR <-
 
 I display the results in a table below: 
 
-```{r kable}
+```{r kable, eval = FALSE}
 
 all_city_OR %>%
    knitr::kable(digits = 3)
@@ -155,7 +155,7 @@ all_city_OR %>%
 
 Lastly, I create a plot that shows the estimated ORs and CIs for each city. Cities are organized according to the estimated OR. 
 
-```{r plot ORs and CIs for each city}
+```{r plot ORs and CIs for each city, eval = FALSE}
 
 # need to edit 
 all_city_OR %>%
@@ -177,28 +177,47 @@ DISCUSS/comment on the plot.
 
 ## Problem 2 
 
-In this problem, I will analyze data gathered to understand the effects of several variables on a child’s birthweight. This dataset consists of `r nrow(birthweight_data)` children and includes the following variables:
+In this problem, I will analyze data gathered to understand the effects of several variables on a child’s birthweight. This dataset consists of 4,342 children and includes the following variables:
 
-babysex: baby’s sex (male = 1, female = 2)
-bhead: baby’s head circumference at birth (centimeters)
-blength: baby’s length at birth (centimeteres)
-bwt: baby’s birth weight (grams)
-delwt: mother’s weight at delivery (pounds)
-fincome: family monthly income (in hundreds, rounded)
-frace: father’s race (1= White, 2 = Black, 3 = Asian, 4 = Puerto Rican, 8 = Other, 9 = Unknown)
-gaweeks: gestational age in weeks
-malform: presence of malformations that could affect weight (0 = absent, 1 = present)
-menarche: mother’s age at menarche (years)
-mheight: mother’s height (inches)
-momage: mother’s age at delivery (years)
-mrace: mother’s race (1= White, 2 = Black, 3 = Asian, 4 = Puerto Rican, 8 = Other)
-parity: number of live births prior to this pregnancy
-pnumlbw: previous number of low birth weight babies
-pnumgsa: number of prior small for gestational age babies
-ppbmi: mother’s pre-pregnancy BMI
-ppwt: mother’s pre-pregnancy weight (pounds)
-smoken: average number of cigarettes smoked per day during pregnancy
-wtgain: mother’s weight gain during pregnancy (pounds)
+* babysex: baby’s sex (male = 1, female = 2)
+
+* bhead: baby’s head circumference at birth (centimeters)
+
+* blength: baby’s length at birth (centimeteres)
+
+* bwt: baby’s birth weight (grams)
+
+* delwt: mother’s weight at delivery (pounds)
+
+* fincome: family monthly income (in hundreds, rounded)
+
+* frace: father’s race (1= White, 2 = Black, 3 = Asian, 4 = Puerto Rican, 8 = Other, 9 = Unknown)
+
+* gaweeks: gestational age in weeks
+
+* malform: presence of malformations that could affect weight (0 = absent, 1 = present)
+
+* menarche: mother’s age at menarche (years)
+
+* mheight: mother’s height (inches)
+
+* momage: mother’s age at delivery (years)
+
+* mrace: mother’s race (1= White, 2 = Black, 3 = Asian, 4 = Puerto Rican, 8 = Other)
+
+* parity: number of live births prior to this pregnancy
+
+* pnumlbw: previous number of low birth weight babies
+
+* pnumgsa: number of prior small for gestational age babies
+
+* ppbmi: mother’s pre-pregnancy BMI
+
+* ppwt: mother’s pre-pregnancy weight (pounds)
+
+* smoken: average number of cigarettes smoked per day during pregnancy
+
+* wtgain: mother’s weight gain during pregnancy (pounds)
 
 The code below loads and clean the data for regression analysis (i.e. converts numeric to factor where appropriate, checks for missing data, etc.). 
 
@@ -295,7 +314,7 @@ final_model = lm(bwt ~ fincome + delwt + gaweeks+ pnumlbw + smoken + ppbmi, data
 
 Removing malformations as a covariate does not change the R squared or adjusted R squared and slightly reduces the AIC, so I will use the adjusted model that excludes malformations:
 
-`r lm(bwt ~ fincome + delwt + gaweeks+ pnumlbw + smoken + ppbmi, data = birthweight_data)`. 
+`lm(bwt ~ fincome + delwt + gaweeks+ pnumlbw + smoken + ppbmi, data = birthweight_data)`. 
 
 Next, I examine a plot of the model's residuals against the fitted values. 
 
